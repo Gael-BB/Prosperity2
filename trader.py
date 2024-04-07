@@ -4,15 +4,28 @@ import numpy as np
 import string
 
 class Trader:
-    past_starfruit_length = 5
+    past_starfruit_length = 4 #optimal value for tutorial round (bearish market) #TODO Figure out value
     past_starfruit = np.array([-1] * past_starfruit_length)
+
+    def buy_max_best_ask(self, product, best_ask, best_ask_amount) -> Order: #, position, max_position
+        # amount = np.minimum(max_position - position, -best_ask_amount) # Notice best_ask_amount is negative #TODO Implement this
+
+        print("BUY", str(-best_ask_amount) + "x", best_ask)
+        return Order(product, best_ask, -best_ask_amount)
+    
+    def sell_max_best_bid(self, product, best_bid, best_bid_amount) -> Order: #, position, max_position
+        # amount = np.minimum(max_position + position, best_bid_amount) # Notice position is negative #TODO Implement this
+        
+        print("SELL", str(best_bid_amount) + "x", best_bid)
+        return Order(product, best_bid, -best_bid_amount)
+
 
     def run(self, state: TradingState):
         result = {}
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
-            #position = state.position[product]
+            position: int = 0 #state.position[product]
 
             match(product):
                 case "AMETHYSTS":
@@ -23,14 +36,12 @@ class Trader:
                     if len(order_depth.sell_orders) != 0:
                         best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                         if int(best_ask) < acceptable_price:
-                            print("BUY", str(-best_ask_amount) + "x", best_ask)
-                            orders.append(Order(product, best_ask, -best_ask_amount))
+                            orders.append(self.buy_max_best_ask(product, best_ask, best_ask_amount)) #, position, 20
             
                     if len(order_depth.buy_orders) != 0:
                         best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
                         if int(best_bid) > acceptable_price:
-                            print("SELL", str(best_bid_amount) + "x", best_bid)
-                            orders.append(Order(product, best_bid, -best_bid_amount))
+                            orders.append(self.sell_max_best_bid(product, best_bid, best_bid_amount)) #, position, 20
                 
                 case "STARFRUIT":
                     if len(order_depth.sell_orders) != 0:
@@ -51,13 +62,11 @@ class Trader:
 
                         if len(order_depth.sell_orders) != 0:
                             if int(best_ask) < acceptable_price:
-                                print("BUY", str(-best_ask_amount) + "x", best_ask)
-                                orders.append(Order(product, best_ask, -best_ask_amount))
+                                orders.append(self.buy_max_best_ask(product, best_ask, best_ask_amount)) #, position, 20
             
                         if len(order_depth.buy_orders) != 0:
                             if int(best_bid) > acceptable_price:
-                                print("SELL", str(best_bid_amount) + "x", best_bid)
-                                orders.append(Order(product, best_bid, -best_bid_amount))
+                                orders.append(self.sell_max_best_bid(product, best_bid, best_bid_amount)) #, position, 20
 
             result[product] = orders
     
