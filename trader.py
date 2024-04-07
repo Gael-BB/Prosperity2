@@ -12,7 +12,7 @@ class Trader:
 
             match(product):
                 case "AMETHYSTS":
-                    acceptable_price = 10
+                    acceptable_price = 10000
                     print("Acceptable price : " + str(acceptable_price))
                     print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
             
