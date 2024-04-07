@@ -1,0 +1,4 @@
+# Ignore R files
+.Rhistory
+.RData
+.Rcheck/
