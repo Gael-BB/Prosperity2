@@ -8,15 +8,20 @@ class Trader:
     past_starfruit_length = 4
     past_starfruit = np.array([-1] * past_starfruit_length)
 
-    def buy_max_best_ask(self, product, best_ask, best_ask_amount, position, max_position) -> Order:
-        amount = np.minimum(max_position - position, int(-best_ask_amount)).item() # Notice best_ask_amount is negative
-        print("BUY", str(amount) + "x", best_ask)
-        return Order(product, best_ask, amount)
-    
-    def sell_max_best_bid(self, product, best_bid, best_bid_amount, position, max_position) -> Order:
-        amount = np.minimum(max_position + position, int(best_bid_amount)).item() # Notice position is negative
-        print("SELL", str(amount) + "x", best_bid)
-        return Order(product, best_bid, -amount)
+    def acceptable_price_trade(self, product, order_depth, position, max_position, acceptable_price) -> List[Order]:
+        orders = []
+        for ask, ask_amount in list(order_depth.sell_orders.items()):
+            if ask < acceptable_price and position != max_position:
+                amount = np.minimum(max_position - position, -ask_amount).item()
+                print(f"Buying {product} at {ask} with {amount}x.")
+                orders.append(Order(product, ask, amount))
+            
+        for bid, bid_amount in list(order_depth.buy_orders.items()):
+            if bid > acceptable_price and position != -max_position:
+                amount = np.minimum(max_position + position, bid_amount).item()
+                print(f"Selling {product} at {bid} with {amount}x.")
+                orders.append(Order(product, bid, -amount))
+        return orders
 
     def run(self, state: TradingState):
         result = {}
@@ -28,51 +33,38 @@ class Trader:
             except:
                 position = 0
                 print(f"Position not found for {product}. Setting to 0")
-            print(state.order_depths)
-            print(product)
-
-            print(order_depth)
 
             match(product):
                 case "AMETHYSTS":
                     acceptable_price = 10000
-                    print("Acceptable price : " + str(acceptable_price))
-                    print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
-            
-                    if len(order_depth.sell_orders) != 0:
-                        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-                        if int(best_ask) < acceptable_price:
-                            orders.append(self.buy_max_best_ask(product, best_ask, best_ask_amount, position, 20))
-            
-                    if len(order_depth.buy_orders) != 0:
-                        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-                        if int(best_bid) > acceptable_price:
-                            orders.append(self.sell_max_best_bid(product, best_bid, best_bid_amount, position, 20))
+                    
+                    # Trade Amethysts according to it's acceptable price, product has max position of 20
+                    current_orders = self.acceptable_price_trade(product, order_depth, position, 20, acceptable_price)
+                    if len(current_orders) != 0:
+                        orders += current_orders
                 
-                case "STARFRUIT": #TODO: CHECK ALL ORDERS AND NOT JUST BEST_ASK AND BEST_BID
+                case "STARFRUIT":
+                    # Calculate Moving Average
                     if len(order_depth.sell_orders) != 0:
-                        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+                        best_ask = list(order_depth.sell_orders.items())[0][0]
                     else:
-                        best_ask, best_ask_amount = self.past_starfruit[0], 0
+                        best_ask = self.past_starfruit[0]
                     
                     if len(order_depth.buy_orders) != 0:
-                        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+                        best_bid = list(order_depth.buy_orders.items())[0][0]
                     else:
-                        best_bid, best_bid_amount = self.past_starfruit[0], 0
+                        best_bid = self.past_starfruit[0]
 
                     self.past_starfruit = np.roll(self.past_starfruit, 1)
                     self.past_starfruit[0] = np.mean([best_ask, best_bid])
                     acceptable_price = np.mean(self.past_starfruit)
 
+                    # Check Moving Average is populated
                     if self.past_starfruit[self.past_starfruit_length-1] != -1:
-
-                        if len(order_depth.sell_orders) != 0:
-                            if int(best_ask) < acceptable_price:
-                                orders.append(self.buy_max_best_ask(product, best_ask, best_ask_amount, position, 20))
-            
-                        if len(order_depth.buy_orders) != 0:
-                            if int(best_bid) > acceptable_price:
-                                orders.append(self.sell_max_best_bid(product, best_bid, best_bid_amount, position, 20))
+                        # Trade Starfruit according to it's acceptable price, product has max position of 20
+                        current_orders = self.acceptable_price_trade(product, order_depth, position, 20, acceptable_price)
+                        if len(current_orders) != 0:
+                            orders += current_orders
 
             result[product] = orders
     
