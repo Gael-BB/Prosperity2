@@ -1,0 +1,1 @@
+#Implement a simulator to test strategies on past data
