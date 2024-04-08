@@ -2,8 +2,10 @@ from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import numpy as np
 import string
+
+# back tester command: & 'c:\Users\Gael Work\AppData\Roaming\Python\Python312\Scripts\prosperity2bt.exe' trader.py 1
 class Trader:
-    past_starfruit_length = 4 #optimal value for tutorial round (bearish market) #TODO Figure out value
+    past_starfruit_length = 4
     past_starfruit = np.array([-1] * past_starfruit_length)
 
     def buy_max_best_ask(self, product, best_ask, best_ask_amount, position, max_position) -> Order:
@@ -47,7 +49,7 @@ class Trader:
                         if int(best_bid) > acceptable_price:
                             orders.append(self.sell_max_best_bid(product, best_bid, best_bid_amount, position, 20))
                 
-                case "STARFRUIT":
+                case "STARFRUIT": #TODO: CHECK ALL ORDERS AND NOT JUST BEST_ASK AND BEST_BID
                     if len(order_depth.sell_orders) != 0:
                         best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                     else:
