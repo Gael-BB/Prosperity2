@@ -1,16 +1,25 @@
-data = read.csv("prices_round_1_day_0.csv", header = TRUE, sep = ";")
-max(data[data$product == 'AMETHYSTS',]$bid_price_1)
-min(data[data$product == 'AMETHYSTS',]$ask_price_1)
+# data = read.csv("prices_round_1_day_0.csv", header = TRUE, sep = ";")
+# amethysts = data[data$product == "AMETHYSTS",]
+# starfruit = data[data$product == "STARFRUIT",]
 
-data2 = read.csv("submission1.csv", header = TRUE, sep = ";")
-max(data2[data2$product == 'AMETHYSTS',]$bid_price_2)
-min(data2[data2$product == 'AMETHYSTS',]$ask_price_2)
-
-
-
-
-
+data = read.csv("submission1.csv", header = TRUE, sep = ";")
 starfruit = data[data$product == "STARFRUIT",]
-plot(starfruit$mid_price, type = "l", col="blue")
+amethysts = data[data$product == "AMETHYSTS",]
 
-data_trades = data = read.csv("trades_round_1_day_0_nn.csv", header = TRUE, sep = ";")
+range = 100:300
+height = c(5020,5050)
+
+
+spo
+plot(starfruit$timestamp[range], starfruit$bid_price_1[range], col="blue", type ="l", ylim = height)
+lines(starfruit$timestamp[range], starfruit$ask_price_1[range], col="red")
+
+ema_function = function(x, n = 3) {
+  sum = n*(n+1)/2
+  weights = (1:n)/sum
+  filter(x, filter = weights, method="convolution", sides=1)
+}
+
+ema = ema_function(starfruit$mid_price, 10)
+
+lines(starfruit$timestamp[range], ema[range], col="green")

@@ -18,8 +18,8 @@ plot(amethyst$ask_price_1)
 plot(amethyst$bid_price_1)
 
 #plot bid and ask for starfruit on same graph
-plot(starfruit$ask_price_1[200:350], type = "l", col = "red")
-lines(starfruit$bid_price_1[200:350], col = "blue")
+plot(starfruit$ask_price_1, type = "l", col = "red")
+lines(starfruit$bid_price_1, col = "blue")
 
 simple_moving_average <- function(data, window_size) {
   n <- length(data)
@@ -40,5 +40,5 @@ simple_moving_average <- function(data, window_size) {
 window_size = 5  # Window size for moving average
 moving_average = simple_moving_average(starfruit$mid_price, window_size)
 
-lines(moving_average[(200-window_size):(350-window_size)], col = "green")
+#lines(moving_average[(200-window_size):(350-window_size)], col = "green")
 
