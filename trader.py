@@ -50,18 +50,19 @@ class Trader:
             match(product):
                 case "AMETHYSTS":
                     acceptable_price = 10000
-                    orders.append(Order(product, acceptable_price-2, max_position - position))
-                    orders.append(Order(product, acceptable_price+2, -max_position - position))
+                    # orders.append(Order(product, acceptable_price-2, max_position - position))
+                    # orders.append(Order(product, acceptable_price+2, -max_position - position))
 
-
-                    # pricing_increment_positions = [0, 10, 17, 20]
+                    pricing_increment_positions = [0, 15, 18, 20]
                     
-                    # if abs(position) == 20: print("WARNING: Amethyst is at max position.")
-                    # for i in range(1, len(pricing_increment_positions)):
-                    #     orders.append(Order(product, acceptable_price - (i+1), np.maximum(pricing_increment_positions[i-1], pricing_increment_positions[i] - position).item() - )
-                    #     orders.append(Order(product, acceptable_price + (i+1), -1))
+                    if abs(position) == 20: print("WARNING: Amethyst is at max position.")
+                    print(f"Amethyst is at position {position}.")
+                    for i in range(1, len(pricing_increment_positions)):
+                        orders.append(Order(product, acceptable_price - (i+1), np.maximum(0,np.minimum(pricing_increment_positions[i]-pricing_increment_positions[i-1],pricing_increment_positions[i]-position)).item()))
+                        orders.append(Order(product, acceptable_price + (i+1), np.minimum(0,np.maximum(pricing_increment_positions[i-1]-pricing_increment_positions[i],-pricing_increment_positions[i]-position)).item()))
                 
                 case "STARFRUIT":
+                    break
                     # Calculate Exponential Moving Average
                     if len(order_depth.sell_orders) != 0:
                         self.starfruit_past_best_ask = list(order_depth.sell_orders.items())[0][0]
