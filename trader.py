@@ -82,6 +82,22 @@ class Trader:
             # Orchids Data
             orchids_data = {'max_position': 100}
             traderData['ORCHIDS'] = orchids_data
+
+            # Chocolate Data
+            chocolate_data = {'max_position': 250}
+            traderData['CHOCOLATE'] = chocolate_data
+
+            # Strawberries Data
+            strawberries_data = {'max_position': 350}
+            traderData['STRAWBERRIES'] = strawberries_data
+
+            # Roses Data
+            roses_data = {'max_position': 60}
+            traderData['ROSES'] = roses_data
+
+            # Gift Basket Data
+            gift_basket_data = {'max_position': 60}
+            traderData['GIFT_BASKET'] = gift_basket_data
         else:
             traderData = jsonpickle.decode(state.traderData)
 
@@ -110,7 +126,19 @@ class Trader:
                     conversions = -position
                     observations = state.observations.conversionObservations['ORCHIDS']
                     international_ask = observations.askPrice + observations.transportFees + observations.importTariff
-                    orders.append(Order(product, round(international_ask + 2.1), -max_position - position))
+                    orders.append(Order(product, round(international_ask + 2.05), -max_position - position))
+                
+                case "CHOCOLATE":
+                    pass
+
+                case "STRAWBERRIES":
+                    pass
+
+                case "ROSES":
+                    pass
+                    
+                case "GIFT_BASKET":
+                    pass
 
             # Don't modify anything below this comment
             traderData[product] = data
