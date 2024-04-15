@@ -21,28 +21,6 @@ class Trader:
             total_volume += bid_volume
         
         return total_price / total_volume
-    
-    def market_take_bids(self, product, order_depth, acceptable_price, position, max_position):
-        if position == max_position:
-            return []
-        
-        orders = []
-        for price, volume in list(order_depth.buy_orders.items()):
-            if price < acceptable_price:
-                orders.append(Order(product, price, min(max_position - position, volume)))
-                position += min(max_position - position, volume)
-        return orders
-    
-    def market_take_asks(self, product, order_depth, acceptable_price, position, max_position):
-        if position == -max_position:
-            return []
-        
-        orders = []
-        for price, volume in list(order_depth.sell_orders.items()):
-            if price > acceptable_price:
-                orders.append(Order(product, price, -min(max_position + position, volume)))
-                position -= min(max_position + position, volume)
-        return orders
     # END OF GENERAL FUNCTIONS
 
     # START OF STARFRUIT FUNCTIONS
@@ -61,6 +39,28 @@ class Trader:
         data['ema'] = data['smoothing_factor'] * mid_price + (1 - data['smoothing_factor']) * data['ema']
         return data, True
     # END OF STARFRUIT FUNCTIONS
+
+    # START OF GIFTS BASKET FUNCTIONS
+    def gift_basket_calculate_z_score(self, traderData):
+        choco, straw = traderData['CHOCOLATE']['last_prices'][-1], traderData['STRAWBERRIES']['last_prices'][-1]
+        rose, basket = traderData['ROSES']['last_prices'][-1], traderData['GIFT_BASKET']['last_prices'][-1]
+        
+        ingredients_price = 4 * choco + 6 * straw + rose
+        return (basket - ingredients_price - traderData['GIFT_BASKET']['premium']) / traderData['GIFT_BASKET']['sd']
+
+    def gift_basket_calculate_premium_and_sd(self, traderData):
+        basket = traderData['GIFT_BASKET']['last_prices']
+        if len(basket) < 10:
+            return traderData
+        
+        choco, straw, rose = traderData['CHOCOLATE']['last_prices'], traderData['STRAWBERRIES']['last_prices'], traderData['ROSES']['last_prices']
+        basket, choco, straw, rose = np.array(basket), np.array(choco), np.array(straw), np.array(rose)
+        ingredient_prices = 4 * choco + 6 * straw + rose
+        traderData['GIFT_BASKET']['premium'] = np.mean(basket - ingredient_prices)
+        traderData['GIFT_BASKET']['sd'] = np.std(basket - ingredient_prices - traderData['GIFT_BASKET']['premium'])
+        return traderData
+
+    # END OF GIFTS BASKET FUNCTIONS
 
     def run(self, state: TradingState):
         result = {}
@@ -84,23 +84,24 @@ class Trader:
             traderData['ORCHIDS'] = orchids_data
 
             # Chocolate Data
-            chocolate_data = {'max_position': 250}
+            chocolate_data = {'max_position': 250, 'last_prices': []}
             traderData['CHOCOLATE'] = chocolate_data
 
             # Strawberries Data
-            strawberries_data = {'max_position': 350}
+            strawberries_data = {'max_position': 350, 'last_prices': []}
             traderData['STRAWBERRIES'] = strawberries_data
 
             # Roses Data
-            roses_data = {'max_position': 60}
+            roses_data = {'max_position': 60, 'last_prices': []}
             traderData['ROSES'] = roses_data
 
             # Gift Basket Data
-            gift_basket_data = {'max_position': 60}
+            gift_basket_data = {'max_position': 60, 'last_prices':[], 'premium': 379.4905, 'sd': 76.4231}
             traderData['GIFT_BASKET'] = gift_basket_data
         else:
             traderData = jsonpickle.decode(state.traderData)
 
+        basket_item_counter = 0
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
@@ -110,35 +111,46 @@ class Trader:
             max_position = data['max_position']
             
             match(product):
-                case "AMETHYSTS":
-                    acceptable_price = 10000
-                    orders.append(Order(product, acceptable_price-2, max_position - position))
-                    orders.append(Order(product, acceptable_price+2, -max_position - position))
+                # case "AMETHYSTS":
+                    # acceptable_price = 10000
+                    # orders.append(Order(product, acceptable_price-1, max_position - position))
+                    # orders.append(Order(product, acceptable_price+1, -max_position - position))
                 
-                case "STARFRUIT":
-                    data, tradable = self.starfruit_calculate_exponential_ma(data, order_depth)
-                    if tradable:
-                        acceptable_price = round(data['ema'])
-                        orders.append(Order(product, acceptable_price-2, max_position - position))
-                        orders.append(Order(product, acceptable_price+2, -max_position - position))
+                # case "STARFRUIT":
+                    # data, tradable = self.starfruit_calculate_exponential_ma(data, order_depth)
+                    # if tradable:
+                    #     acceptable_price = round(data['ema'])
+                    #     orders.append(Order(product, acceptable_price-2, max_position - position))
+                    #     orders.append(Order(product, acceptable_price+2, -max_position - position))
 
-                case "ORCHIDS":
-                    conversions = -position
-                    observations = state.observations.conversionObservations['ORCHIDS']
-                    international_ask = observations.askPrice + observations.transportFees + observations.importTariff
-                    orders.append(Order(product, round(international_ask + 2.05), -max_position - position))
+                # case "ORCHIDS":
+                    # conversions = -position
+                    # observations = state.observations.conversionObservations['ORCHIDS']
+                    # international_ask = observations.askPrice + observations.transportFees + observations.importTariff
+                    # orders.append(Order(product, round(international_ask + 1), -max_position - position))
                 
-                case "CHOCOLATE":
-                    pass
+                case "CHOCOLATE" | "STRAWBERRIES" | "ROSES" | "GIFT_BASKET":
+                    basket_item_counter += 1
+                    data['last_prices'].append(self.calculate_weighted_mid_price(order_depth))
 
-                case "STRAWBERRIES":
-                    pass
+                    if basket_item_counter == 4:
+                        traderData[product] = data
+                        traderData = self.gift_basket_calculate_premium_and_sd(traderData)
+                        z_score = self.gift_basket_calculate_z_score(traderData)
+                        print(f"Z-Score: {z_score}")
 
-                case "ROSES":
-                    pass
-                    
-                case "GIFT_BASKET":
-                    pass
+                        ingredients = ['CHOCOLATE', 'STRAWBERRIES', 'ROSES']
+                        if z_score >= 1.5:
+                            result['GIFT_BASKET'] = [ Order('GIFT_BASKET', round(traderData['GIFT_BASKET']['last_prices'][-1]) + 1, traderData['GIFT_BASKET']['max_position'] - state.position.get('GIFT_BASKET', 0)) ]
+                            for i in ingredients:
+                               result[i] = [ Order(i, round(traderData[i]['last_prices'][-1]) - 1, -traderData[i]['max_position'] - state.position.get(i, 0)) ]
+
+                        if z_score <= -1.5:
+                            result['GIFT_BASKET'] = [ Order('GIFT_BASKET', round(traderData['GIFT_BASKET']['last_prices'][-1]) - 1, -traderData['GIFT_BASKET']['max_position'] - state.position.get('GIFT_BASKET', 0)) ]
+                            for i in ingredients:
+                                result[i] = [ Order(i, round(traderData[i]['last_prices'][-1]) + 1, traderData[i]['max_position'] - state.position.get(i, 0)) ]
+                           
+                                
 
             # Don't modify anything below this comment
             traderData[product] = data
