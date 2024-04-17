@@ -40,17 +40,38 @@ class Trader:
         return predicted
     # END OF GENERAL FUNCTIONS
 
-    # START OF GIFTS BASKET FUNCTIONS
+    # START OF GIFTS BASKET AND INGREDIENTS FUNCTIONS
     def gift_basket_calculate_target_position(self, traderData):
+        if len(traderData['INGREDIENTS']['last_basket_prices']) < 20:
+            return 0, False
+        
+        if len(traderData['INGREDIENTS']['last_basket_prices']) > 1000:
+            traderData['INGREDIENTS']['last_basket_prices'].pop(0)
+            traderData['INGREDIENTS']['last_ingredients_prices'].pop(0)
+        
         premium_prices = np.array(traderData['INGREDIENTS']['last_basket_prices']) - np.array(traderData['INGREDIENTS']['last_ingredients_prices'])
         premium_mean = np.mean(premium_prices)
         premium_std = np.std(premium_prices - premium_mean)
-        print(f"Mean: {premium_mean}. Std: {premium_std}.")
+        
         if premium_std == 0:
-            return 0
-        # IDK if this should be multiplied by -1 or not
-        return -erf((premium_prices[-1] - premium_mean) / premium_std) * traderData['GIFT_BASKET']['max_position']
+            return 0, False
+        return -erf((premium_prices[-1] - premium_mean) / premium_std) * traderData['GIFT_BASKET']['max_position'], True
     
+    def ingredients_buy(self, state, traderData, result):
+        for prod in ['CHOCOLATE', 'ROSES']: #, 'STRAWBERRIES']:
+            best_ask = list(state.order_depths[prod].sell_orders.keys())[0]
+            max_position = traderData[prod]['max_position']
+            position = state.position.get(prod, 0)
+            result[prod] = [Order(prod, best_ask, max_position - position)]
+        return result
+    
+    def ingredients_sell(self, state, traderData, result):
+        for prod in ['CHOCOLATE', 'ROSES']: #, 'STRAWBERRIES']:
+            best_bid = list(state.order_depths[prod].buy_orders.keys())[0]
+            max_position = traderData[prod]['max_position']
+            position = state.position.get(prod, 0)
+            result[prod] = [Order(prod, best_bid, -max_position - position)]
+        return result
     # END OF GIFTS BASKET FUNCTIONS
 
     def run(self, state: TradingState):
@@ -91,13 +112,13 @@ class Trader:
             traderData['GIFT_BASKET'] = gift_basket_data
 
             # Ingredients Data
-            ingredients_data = {'last_basket_prices': [], 'last_ingredients_prices': [0]}
+            ingredients_data = {'last_basket_prices': [], 'last_ingredients_prices': [0]} #, 'n': 0, 'sum_x': 0, 'sum_x_squared': 0}
             traderData['INGREDIENTS'] = ingredients_data
         else:
             traderData = jsonpickle.decode(state.traderData)
 
         products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
-        for product in products: #['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']:
+        for product in ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']: #products:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
 
@@ -128,25 +149,23 @@ class Trader:
                 case "CHOCOLATE" | "STRAWBERRIES" | "ROSES":
                     product_multiplier = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
                     traderData['INGREDIENTS']['last_ingredients_prices'][-1] += self.calculate_weighted_mid_price(order_depth) * product_multiplier[product]
-                    #TODO: Find a way to make money off these products
                 
                 case "GIFT_BASKET":
                     traderData['INGREDIENTS']['last_basket_prices'].append(self.calculate_weighted_mid_price(order_depth))
                     
-                    target_position = int(round(self.gift_basket_calculate_target_position(traderData)))
+                    target_position, tradable = self.gift_basket_calculate_target_position(traderData)
                     best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
                     
-                    # Experiment with multiplier at the end of order_price
-                    order_price = (best_ask + best_bid) / 2  +  (position - target_position) / data['max_position'] * (best_ask - best_bid) * 2
+                    if tradable:
+                        threshold_target_position = 30
+                        if target_position < -threshold_target_position:
+                            orders.append(Order(product, best_bid, -max_position - position))
+                            result = self.ingredients_sell(state, traderData, result)
+                        elif target_position > threshold_target_position:
+                            orders.append(Order(product, best_ask, max_position - position))
+                            result = self.ingredients_buy(state, traderData, result)
+                        print(f"target_position: {target_position}, position: {position}.")
 
-                    # NOT ENOUGH TRADES BEING EXECUTED
-                    if target_position > 0:
-                        orders.append(Order(product, round(order_price), target_position - position))
-                    else:
-                        orders.append(Order(product, round(order_price), -target_position - position))
-
-                    print(f"Target position: {target_position}. Current position: {position}.")
-                    
                     # Needed to provide entry for next iteration
                     traderData['INGREDIENTS']['last_ingredients_prices'].append(0)
                            
