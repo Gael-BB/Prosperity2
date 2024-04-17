@@ -138,7 +138,7 @@ class Trader:
                     observations = state.observations.conversionObservations['ORCHIDS']
                     international_ask = observations.askPrice + observations.transportFees + observations.importTariff
                     best_bid = list(order_depth.buy_orders.keys())[0]
-                    orders.append(Order(product, int(max(np.ceil(international_ask), best_bid + 2)), -max_position - position))
+                    orders.append(Order(product, int(max(np.ceil(international_ask), best_bid + 2)), -max_position))
                 
                 case "CHOCOLATE" | "STRAWBERRIES" | "ROSES":
                     product_multiplier = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
