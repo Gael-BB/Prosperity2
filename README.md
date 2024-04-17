@@ -1,12 +1,11 @@
 # Prosperity2
+This repository shows our code for the IMC Trading Competition Prosperity2. This competition consisted of 5 rounds, each one with an algorithmic trading part and manual trading part that consisted of solving a brain teaser, related to probability and game theory.
 
 # Round 1
-Manual Trading:
+In the first round, we got introduced to two products: AMETHYSTS and STARFRUIT. Amethysts was quite easy to trade as it's price stayed around 10000 units. We traded it by simply putting buying orders at 9998 and 10002. Starfruit's price was very spiky, but a moving average showed that it's price did not move much. It's trend would change quite suddenly so we opted for an exponential moving average. We bought starfruit when the spikes went below the moving average and sold when the spikes would go above.
 
-A huge school of goldfish arrived at our shores. And they all brought scuba gear they want to get rid of fast. For the right price of course.
+# Round 2
+In the second round, we were introduced to ORCHIDS. Orchids were brought two new features. The first feature allowed to measure the current humidity and sunlight, said to influence the price of orchids significantly. The second feature allowed us to buy and sell orchids with another island. After thorough analysis consisting of many different linear and non-linear regressions, no pattern was found. We concluded that the sunlight and humidity indicators were simply a distraction from the main opportunity to make profit, arbitrage. The cost of importing the product was at time lower than the price of sell the item to the island. This was not obvious to spot as we were given no past data on total importing/exporting prices. Our strategy was therefor simply putting selling orders just above the price of importing the product.
 
-You only have two chances to offer a good price. Each one of the goldfish will accept the lowest bid that is over their reserve price. There’s a constant desire for scuba gear on the archipelago. So, at the end of the round, you’ll be able to sell them for 1000 SeaShells a piece. Your goal is to set prices that ensure a profitable trade with as many goldfish as possible.
-
-Once you are satisfied with your strategy and input, use the ‘Submit manual trade’ button to lock it in. Note that you can (re)submit new strategies as long as the round is still in progress. As soon as the round ends, the trading strategy that was submitted last will be processed.
-
-Set your prices to buy scuba gear. You can set a lowest and a highest bid. Whilst not every goldfish has the same reserve price, you know the distribution of their reserve prices. The reserve price will be no lower than 900 and no higher than 1000. The probability scales linearly from least likely at 900 to most likely at 1000.
+# Round 3
+In the third round, we were introduced to 4 new products: CHOCOLATE, STRAWBERRIES, ROSES, GIFT_BASKET. In theory, a gift basket consists of 4 chocolate bars, 6 strawberries and 1 rose. The price of gift basket was very correlated to the cost of the constituents of the basket. We devised a very simple pair trading strategy. We treated the price of the gift basket as being the sum of the constituents and a premium. We dynamically calculated the mean price and the standard deviation of the premium. This way we knew when the premium was under or over valued. When the premium was a certain amounts of standard deviations away from the mean, we operated. Surprisingly, we found that instead of doing the opposite operation on the consituents, we made a lot of profit by doing the same operation.
