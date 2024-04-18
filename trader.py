@@ -6,6 +6,9 @@ import jsonpickle
 
 # back tester command: & 'c:\Users\Gael Work\AppData\Roaming\Python\Python312\Scripts\prosperity2bt.exe' trader.py 1
 class Trader:
+    # GLOBAL CONSTANTS (not variables, due to AWS Lambda Bugs)
+    max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60}
+    
     # GENERAL FUNCTIONS
     def calculate_weighted_mid_price(self, order_depth):
         if len(order_depth.sell_orders) == 0 or len(order_depth.buy_orders) == 0:
@@ -28,7 +31,6 @@ class Trader:
         
         if data['ema'] == -1:
             data['ema'] = mid_price
-            print("Initialized starfruit exponential moving average.")
             return data, False
         
         data['ema'] = data['smoothing_factor'] * mid_price + (1 - data['smoothing_factor']) * data['ema']
@@ -42,19 +44,19 @@ class Trader:
 
     # START OF GIFTS BASKET AND INGREDIENTS FUNCTIONS
     def gift_basket_calculate_target_position(self, data):
-        if data['n'] < 100: #TODO: Experiment with this value (100 to 200 more or less)
+        if data['n'] < 100:
             return 0, False
         
         mean = data['sum_x'] / data['n']
         std = np.sqrt(data['sum_x_squared'] / data['n'] - mean ** 2)
         if std == 0:
             return 0, False
-        return -erf((data['x'] - mean) / std) * 60, True
+        return -erf((data['x'] - mean) / std) * self.max_positions['GIFT_BASKET'], True
     
     def ingredients_buy(self, state, traderData, result):
         for prod in ['CHOCOLATE', 'ROSES', 'STRAWBERRIES']:
             best_ask = list(state.order_depths[prod].sell_orders.keys())[0]
-            max_position = traderData[prod]['max_position']
+            max_position = self.max_positions[prod]
             position = state.position.get(prod, 0)
             result[prod] = [Order(prod, best_ask, max_position - position)]
         return result
@@ -62,7 +64,7 @@ class Trader:
     def ingredients_sell(self, state, traderData, result):
         for prod in ['CHOCOLATE', 'ROSES', 'STRAWBERRIES']:
             best_bid = list(state.order_depths[prod].buy_orders.keys())[0]
-            max_position = traderData[prod]['max_position']
+            max_position = self.max_positions[prod]
             position = state.position.get(prod, 0)
             result[prod] = [Order(prod, best_bid, -max_position - position)]
         return result
@@ -75,50 +77,22 @@ class Trader:
             # ALL VARIABLES THAT NEED STORAGE GO HERE
             traderData = {}
 
-            # Amethysts Data
-            amethysts_data = {'max_position': 20}
-            traderData['AMETHYSTS'] = amethysts_data
-
-            # Starfuit Data
-            starfruit_data = {'max_position': 20, 'ema': -1}
+            # Starfuit EMA Data
             ema_period = 4
-            starfruit_data['smoothing_factor'] = 1 / (ema_period + 1)
-            traderData['STARFRUIT'] = starfruit_data
-
-            # Orchids Data
-            orchids_data = {'max_position': 100}
-            traderData['ORCHIDS'] = orchids_data
-
-            # Chocolate Data
-            chocolate_data = {'max_position': 250}
-            traderData['CHOCOLATE'] = chocolate_data
-
-            # Strawberries Data
-            strawberries_data = {'max_position': 350}
-            traderData['STRAWBERRIES'] = strawberries_data
-
-            # Roses Data
-            roses_data = {'max_position': 60}
-            traderData['ROSES'] = roses_data
-
-            # Gift Basket Data
-            gift_basket_data = {'max_position': 60}
-            traderData['GIFT_BASKET'] = gift_basket_data
+            traderData['STARFRUIT'] = {'ema': -1, 'smoothing_factor':  1 / (ema_period + 1)}
 
             # Ingredients Data
-            ingredients_data = {'last_basket_price': 0, 'last_ingredients_price': 0, 'n': 0, 'x': 0, 'sum_x': 0, 'sum_x_squared': 0}
-            traderData['INGREDIENTS'] = ingredients_data
+            traderData['INGREDIENTS'] = {'last_basket_price': 0, 'last_ingredients_price': 0, 'n': 0, 'x': 0, 'sum_x': 0, 'sum_x_squared': 0}
         else:
             traderData = jsonpickle.decode(state.traderData)
 
         products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
-        for product in products: # ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']: #
+        for product in products:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
 
-            data = traderData[product]
             position = state.position.get(product, 0)
-            max_position = data['max_position']
+            max_position = self.max_positions[product]
             
             match(product):
                 case "AMETHYSTS":
@@ -127,9 +101,9 @@ class Trader:
                     orders.append(Order(product, acceptable_price+2, -max_position - position))
                 
                 case "STARFRUIT":
-                    data, tradable = self.calculate_exponential_ma(data, order_depth)
+                    traderData['STARFRUIT'], tradable = self.calculate_exponential_ma(traderData['STARFRUIT'], order_depth)
                     if tradable:
-                        acceptable_price = round(data['ema'])
+                        acceptable_price = round(traderData['STARFRUIT']['ema'])
                         orders.append(Order(product, acceptable_price-2, max_position - position))
                         orders.append(Order(product, acceptable_price+2, -max_position - position))
 
@@ -182,7 +156,6 @@ class Trader:
                     traderData['INGREDIENTS']['last_ingredients_price'] = 0
                            
             # Don't modify anything below this comment
-            traderData[product] = data
             result[product] = orders
         # Notice the indentation    
         traderData = jsonpickle.encode(traderData)
