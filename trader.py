@@ -7,7 +7,7 @@ import jsonpickle
 # back tester command: & 'c:\Users\Gael Work\AppData\Roaming\Python\Python312\Scripts\prosperity2bt.exe' trader.py 1
 class Trader:
     # GLOBAL CONSTANTS (not variables, due to AWS Lambda Bugs)
-    max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60}
+    max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60, 'COCONUT': 300, 'COCONUT_COUPON': 600}
     
     # GENERAL FUNCTIONS
     def calculate_weighted_mid_price(self, order_depth):
@@ -147,13 +147,18 @@ class Trader:
                         threshold_target_position = 46
                         if target_position < -threshold_target_position:
                             orders.append(Order(product, best_bid, -max_position - position))
-                            result = self.ingredients_sell(state, traderData, result)
+                            #result = self.ingredients_buy(state, traderData, result)
                         elif target_position > threshold_target_position:
                             orders.append(Order(product, best_ask, max_position - position))
-                            result = self.ingredients_buy(state, traderData, result)
+                            #result = self.ingredients_sell(state, traderData, result)
 
                     # Needed to provide entry for next iteration
                     traderData['INGREDIENTS']['last_ingredients_price'] = 0
+                case 'COCONUT':
+                    pass
+
+                case 'COCONUT_COUPON':
+                    pass
                            
             # Don't modify anything below this comment
             result[product] = orders
