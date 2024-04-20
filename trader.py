@@ -7,8 +7,11 @@ import jsonpickle
 # back tester command: & 'c:\Users\Gael Work\AppData\Roaming\Python\Python312\Scripts\prosperity2bt.exe' trader.py 1
 class Trader:
     # GLOBAL CONSTANTS (not variables, due to AWS Lambda Bugs)
+    products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET', 'COCONUT_COUPON', 'COCONUT']
     max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60, 'COCONUT': 300, 'COCONUT_COUPON': 600}
-    
+    coupon_historic_mean = 637.63
+    coupon_scaling_factor = 16.19259
+
     # GENERAL FUNCTIONS
     def calculate_weighted_mid_price(self, order_depth):
         if len(order_depth.sell_orders) == 0 or len(order_depth.buy_orders) == 0:
@@ -40,10 +43,8 @@ class Trader:
         predicted = round(prices[-1] * (1 + np.dot(np.array(prices), np.array(coef)) + intercept))
         print(f"Current price: {prices[-1]}. Predicted price: {predicted}")
         return predicted
-    # END OF GENERAL FUNCTIONS
-
-    # START OF GIFTS BASKET AND INGREDIENTS FUNCTIONS
-    def gift_basket_calculate_target_position(self, data):
+    
+    def calculate_target_position(self, data, max_position):
         if data['n'] < 100:
             return 0, False
         
@@ -51,8 +52,10 @@ class Trader:
         std = np.sqrt(data['sum_x_squared'] / data['n'] - mean ** 2)
         if std == 0:
             return 0, False
-        return -erf((data['x'] - mean) / std) * self.max_positions['GIFT_BASKET'], True
+        return -erf((data['x'] - mean) / std) * max_position, True
+    # END OF GENERAL FUNCTIONS
     
+    # START OF GIFTS BASKET AND INGREDIENTS FUNCTIONS
     def ingredients_buy(self, state, traderData, result):
         for prod in ['CHOCOLATE', 'ROSES', 'STRAWBERRIES']:
             best_ask = list(state.order_depths[prod].sell_orders.keys())[0]
@@ -70,6 +73,13 @@ class Trader:
         return result
     # END OF GIFTS BASKET FUNCTIONS
 
+    # START OF COCONUTS FUNCTIONS
+    def calculate_black_scholes(self, S, sigma = 0.05652, T = 1, r = 0, K = 10000):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
+        return S * erf(d1) - K * np.exp(-r * T) * erf(d2)
+    # END OF COCONUTS FUNCTIONS
+
     def run(self, state: TradingState):
         result = {}
         conversions = 0
@@ -83,17 +93,22 @@ class Trader:
 
             # Ingredients Data
             traderData['INGREDIENTS'] = {'last_basket_price': 0, 'last_ingredients_price': 0, 'n': 0, 'x': 0, 'sum_x': 0, 'sum_x_squared': 0}
+
+            # Coconuts Data
+            ema_period = 4
+            traderData['COCONUT'] = {'last_product_price': 0, 'last_coupon_price': 0}
+
         else:
             traderData = jsonpickle.decode(state.traderData)
 
-        products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
-        for product in products:
+        for product in ['COCONUT_COUPON', 'COCONUT']:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
 
             position = state.position.get(product, 0)
             max_position = self.max_positions[product]
             
+            print(f"")
             match(product):
                 case "AMETHYSTS":
                     acceptable_price = 10000
@@ -126,7 +141,7 @@ class Trader:
                     traderData['INGREDIENTS']['sum_x'] += traderData['INGREDIENTS']['x']
                     traderData['INGREDIENTS']['sum_x_squared'] += traderData['INGREDIENTS']['x'] ** 2
  
-                    target_position, tradable = self.gift_basket_calculate_target_position(traderData['INGREDIENTS'])
+                    target_position, tradable = self.calculate_target_position(traderData['INGREDIENTS'], self.max_positions['GIFT_BASKET'])
                     best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
                     
                     if tradable:
@@ -154,10 +169,21 @@ class Trader:
 
                     # Needed to provide entry for next iteration
                     traderData['INGREDIENTS']['last_ingredients_price'] = 0
-                case 'COCONUT':
-                    pass
 
                 case 'COCONUT_COUPON':
+                    traderData['COCONUT']['last_coupon_price'] = self.calculate_weighted_mid_price(state.order_depths['COCONUT_COUPON'])
+                    traderData['COCONUT']['last_product_price'] = self.calculate_weighted_mid_price(state.order_depths['COCONUT'])
+                    if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
+                        break
+                    black_scholes_price = (self.calculate_black_scholes(traderData['COCONUT']['last_product_price'])
+                                           - self.coupon_historic_mean) * self.coupon_scaling_factor + self.coupon_historic_mean
+                    print(f"COUPON PRICE: {traderData['COCONUT']['last_coupon_price']}. BLACK SCHOLES: {black_scholes_price}.")
+                    if traderData['COCONUT']['last_coupon_price'] > black_scholes_price:
+                        orders.append(Order(product, list(state.order_depths['COCONUT_COUPON'].buy_orders.keys())[0], -max_position - position))
+                    else:
+                        orders.append(Order(product, list(state.order_depths['COCONUT_COUPON'].sell_orders.keys())[0], max_position - position))
+
+                case 'COCONUT':
                     pass
                            
             # Don't modify anything below this comment
