@@ -72,10 +72,14 @@ class Trader:
     # END OF GIFTS BASKET FUNCTIONS
 
     # START OF COCONUTS FUNCTIONS
-    def calculate_black_scholes(self, S, sigma = 0.010119, T = 250, r = 0, K = 10000):
+    def coconuts_calculate_black_scholes(self, S, sigma = 0.010201268, T = 246, r = 0, K = 10000):
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
         return S * 0.5 * (1 + erf(d1/np.sqrt(2))) - K * np.exp(-r * T) * 0.5 * (1 + erf(d2/np.sqrt(2)))
+    
+    def coconuts_calculate_delta(self, S, sigma = 0.010119, T = 250, r = 0, K = 10000):
+        d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+        return 0.5 * (1 + erf(d1/np.sqrt(2)))
     # END OF COCONUTS FUNCTIONS
 
     def run(self, state: TradingState):
@@ -174,7 +178,7 @@ class Trader:
                     if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
                         break
 
-                    black_scholes_price = self.calculate_black_scholes(traderData['COCONUT']['last_product_price'])
+                    black_scholes_price = self.coconuts_calculate_black_scholes(traderData['COCONUT']['last_product_price'])
                     coupon_bid_ask_spread_d2 = 1.2808260275342511 / 2
 
                     if traderData['COCONUT']['last_coupon_price'] > black_scholes_price + coupon_bid_ask_spread_d2:
@@ -183,7 +187,15 @@ class Trader:
                         orders.append(Order(product, list(state.order_depths['COCONUT_COUPON'].sell_orders.keys())[0], max_position - position))
 
                 case 'COCONUT':
-                    pass
+                    if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
+                        break
+                    delta = self.coconuts_calculate_delta(traderData['COCONUT']['last_product_price'])
+                    target_position = -delta * state.position.get('COCONUT_COUPON', 0)
+                    best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
+                    if target_position - position > 0:
+                        orders.append(Order(product, best_ask, round(target_position - position)))
+                    elif target_position - position < 0:
+                        orders.append(Order(product, best_bid, round(target_position - position)))
                            
             # Don't modify anything below this comment
             result[product] = orders
