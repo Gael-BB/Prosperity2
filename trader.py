@@ -99,7 +99,7 @@ class Trader:
         else:
             traderData = jsonpickle.decode(state.traderData)
 
-        for product in ['COCONUT_COUPON', 'COCONUT']:
+        for product in self.products:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
 
