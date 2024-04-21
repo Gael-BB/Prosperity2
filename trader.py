@@ -9,8 +9,6 @@ class Trader:
     # GLOBAL CONSTANTS (not variables, due to AWS Lambda Bugs)
     products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET', 'COCONUT_COUPON', 'COCONUT']
     max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60, 'COCONUT': 300, 'COCONUT_COUPON': 600}
-    coupon_historic_mean = 637.63
-    coupon_scaling_factor = 16.19259
 
     # GENERAL FUNCTIONS
     def calculate_weighted_mid_price(self, order_depth):
@@ -74,10 +72,10 @@ class Trader:
     # END OF GIFTS BASKET FUNCTIONS
 
     # START OF COCONUTS FUNCTIONS
-    def calculate_black_scholes(self, S, sigma = 0.05652, T = 1, r = 0, K = 10000):
+    def calculate_black_scholes(self, S, sigma = 0.010119, T = 250, r = 0, K = 10000):
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
-        return S * erf(d1) - K * np.exp(-r * T) * erf(d2)
+        return S * 0.5 * (1 + erf(d1/np.sqrt(2))) - K * np.exp(-r * T) * 0.5 * (1 + erf(d2/np.sqrt(2)))
     # END OF COCONUTS FUNCTIONS
 
     def run(self, state: TradingState):
@@ -175,12 +173,13 @@ class Trader:
                     traderData['COCONUT']['last_product_price'] = self.calculate_weighted_mid_price(state.order_depths['COCONUT'])
                     if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
                         break
-                    black_scholes_price = (self.calculate_black_scholes(traderData['COCONUT']['last_product_price'])
-                                           - self.coupon_historic_mean) * self.coupon_scaling_factor + self.coupon_historic_mean
-                    print(f"COUPON PRICE: {traderData['COCONUT']['last_coupon_price']}. BLACK SCHOLES: {black_scholes_price}.")
-                    if traderData['COCONUT']['last_coupon_price'] > black_scholes_price:
+
+                    black_scholes_price = self.calculate_black_scholes(traderData['COCONUT']['last_product_price'])
+                    coupon_bid_ask_spread_d2 = 1.2808260275342511 / 2
+
+                    if traderData['COCONUT']['last_coupon_price'] > black_scholes_price + coupon_bid_ask_spread_d2:
                         orders.append(Order(product, list(state.order_depths['COCONUT_COUPON'].buy_orders.keys())[0], -max_position - position))
-                    else:
+                    elif traderData['COCONUT']['last_coupon_price'] < black_scholes_price - coupon_bid_ask_spread_d2:
                         orders.append(Order(product, list(state.order_depths['COCONUT_COUPON'].sell_orders.keys())[0], max_position - position))
 
                 case 'COCONUT':
