@@ -41,8 +41,10 @@ class Trader:
         predicted = round(prices[-1] * (1 + np.dot(np.array(prices), np.array(coef)) + intercept))
         print(f"Current price: {prices[-1]}. Predicted price: {predicted}")
         return predicted
+    # END OF GENERAL FUNCTIONS
     
-    def calculate_target_position(self, data, max_position):
+    # START OF GIFT BASKET FUNCTIONS
+    def gift_basket_calculate_target_position(self, data, max_position):
         if data['n'] < 100:
             return 0, False
         
@@ -51,25 +53,7 @@ class Trader:
         if std == 0:
             return 0, False
         return -erf((data['x'] - mean) / std) * max_position, True
-    # END OF GENERAL FUNCTIONS
-    
-    # START OF GIFTS BASKET AND INGREDIENTS FUNCTIONS
-    # def ingredients_buy(self, state, traderData, result):
-    #     for prod in ['CHOCOLATE', 'ROSES', 'STRAWBERRIES']:
-    #         best_ask = list(state.order_depths[prod].sell_orders.keys())[0]
-    #         max_position = self.max_positions[prod]
-    #         position = state.position.get(prod, 0)
-    #         result[prod] = [Order(prod, best_ask, max_position - position)]
-    #     return result
-    
-    # def ingredients_sell(self, state, traderData, result):
-    #     for prod in ['CHOCOLATE', 'ROSES', 'STRAWBERRIES']:
-    #         best_bid = list(state.order_depths[prod].buy_orders.keys())[0]
-    #         max_position = self.max_positions[prod]
-    #         position = state.position.get(prod, 0)
-    #         result[prod] = [Order(prod, best_bid, -max_position - position)]
-    #     return result
-    # END OF GIFTS BASKET FUNCTIONS
+    # END OF GIFT BASKET FUNCTIONS
 
     # START OF COCONUTS FUNCTIONS
     def coconuts_calculate_black_scholes(self, S, sigma = 0.010201268, T = 246, r = 0, K = 10000):
@@ -143,24 +127,10 @@ class Trader:
                     traderData['INGREDIENTS']['sum_x'] += traderData['INGREDIENTS']['x']
                     traderData['INGREDIENTS']['sum_x_squared'] += traderData['INGREDIENTS']['x'] ** 2
  
-                    target_position, tradable = self.calculate_target_position(traderData['INGREDIENTS'], self.max_positions['GIFT_BASKET'])
+                    target_position, tradable = self.gift_basket_calculate_target_position(traderData['INGREDIENTS'], self.max_positions['GIFT_BASKET'])
                     best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
                     
                     if tradable:
-                        # JUST GIFT BASKET
-                        #  (0, 179)  (2, 196)  (4, 198)  (6, 218)  (8, 223)
-                        # (10, 236) (12, 234) (14, 243) (16, 249) (18, 252)
-                        # (20, 248) (22, 237) (24, 235) (26, 241) (28, 251)
-                        # (30, 254) (32, 253) (34, 251) (36, 246) (38, 233)
-                        # (40, 248) (42, 259) (44, 279) (46, 299) (48, 292)
-                        # (50, 262) (52, 225) (54, 179) (56, 167) (58, 181)
-                        # BASKET WITH INGREDIENTS
-                        # (40, 269) (42, 289) (44, 324) (46, 342) (48, 344)
-                        # (50, 305) (52, 225) (54, 172) (56, 127) (58, 121)
-                        # (45, 346) (47, 343) (49, 321)
-                        # Good plateau from 45 to 49.
-                        # Drop off after 49 very steep, choose 46 threshold.
-                        # All ingredients make profit on average, include them.
                         threshold_target_position = 46
                         if target_position < -threshold_target_position:
                             orders.append(Order(product, best_bid, -max_position - position))
