@@ -6,11 +6,29 @@ import jsonpickle
 
 # back tester command: & 'c:\Users\Gael Work\AppData\Roaming\Python\Python312\Scripts\prosperity2bt.exe' trader.py 1
 class Trader:
-    # GLOBAL CONSTANTS (not variables, due to AWS Lambda Bugs)
-    products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET', 'COCONUT_COUPON', 'COCONUT']
+    # General Constants
+    products = ['AMETHYSTS', 'STARFRUIT', 'ORCHIDS', 'GIFT_BASKET', 'CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'COCONUT_COUPON', 'COCONUT']
     max_positions = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100, 'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60, 'COCONUT': 300, 'COCONUT_COUPON': 600}
 
-    # GENERAL FUNCTIONS
+    # Amethysts Constants
+    amethysts_acceptable_price = 10000
+
+    # Starfruit Constants
+    starfruit_ema_period = 4
+
+    # Gift Basket Constants
+    gift_basket_ingredients = ['CHOCOLATE', 'STRAWBERRIES', 'ROSES']
+    gift_basket_ingredient_multiplier = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
+    basket_threshold_target_position = 46
+
+    # Coconuts Constants
+    coco_coupon_bid_ask_spread_d2 = 1.2808260275342511 / 2
+    coco_sigma = 0.010201268
+    coco_T = 246
+    coco_r = 0
+    coco_K = 10000
+
+    # General Functions
     def calculate_weighted_mid_price(self, order_depth):
         if len(order_depth.sell_orders) == 0 or len(order_depth.buy_orders) == 0:
             return None
@@ -27,7 +45,8 @@ class Trader:
         
         return total_price / total_volume
     
-    def calculate_exponential_ma(self, data, order_depth):
+    # Starfruit Functions
+    def starfruit_calculate_exponential_ma(self, data, order_depth):
         mid_price = self.calculate_weighted_mid_price(order_depth)
         
         if data['ema'] == -1:
@@ -36,15 +55,9 @@ class Trader:
         
         data['ema'] = data['smoothing_factor'] * mid_price + (1 - data['smoothing_factor']) * data['ema']
         return data, True
-    
-    def calculate_regression(self, prices, coef, intercept):
-        predicted = round(prices[-1] * (1 + np.dot(np.array(prices), np.array(coef)) + intercept))
-        print(f"Current price: {prices[-1]}. Predicted price: {predicted}")
-        return predicted
-    # END OF GENERAL FUNCTIONS
-    
-    # START OF GIFT BASKET FUNCTIONS
-    def gift_basket_calculate_target_position(self, data, max_position):
+
+    # Gift Basket Functions
+    def gift_basket_calculate_target_position(self, data):
         if data['n'] < 100:
             return 0, False
         
@@ -52,37 +65,33 @@ class Trader:
         std = np.sqrt(data['sum_x_squared'] / data['n'] - mean ** 2)
         if std == 0:
             return 0, False
-        return -erf((data['x'] - mean) / std) * max_position, True
-    # END OF GIFT BASKET FUNCTIONS
+        return -erf((data['x'] - mean) / std) * self.max_positions['GIFT_BASKET'], True
 
-    # START OF COCONUTS FUNCTIONS
-    def coconuts_calculate_black_scholes(self, S, sigma = 0.010201268, T = 246, r = 0, K = 10000):
+    # Coconuts Function
+    def coconuts_calculate_black_scholes(self, S):
+        sigma, T, r, K = self.coco_sigma, self.coco_T, self.coco_r, self.coco_K
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
         return S * 0.5 * (1 + erf(d1/np.sqrt(2))) - K * np.exp(-r * T) * 0.5 * (1 + erf(d2/np.sqrt(2)))
     
-    def coconuts_calculate_delta(self, S, sigma = 0.010201268, T = 246, r = 0, K = 10000):
+    def coconuts_calculate_delta(self, S):
+        sigma, T, r, K = self.coco_sigma, self.coco_T, self.coco_r, self.coco_K
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         return 0.5 * (1 + erf(d1/np.sqrt(2)))
-    # END OF COCONUTS FUNCTIONS
-
+    
+    # Main Function
     def run(self, state: TradingState):
         result = {}
         conversions = 0
         if state.timestamp == 0:
-            # ALL VARIABLES THAT NEED STORAGE GO HERE
+            # All variables that need to be stored between iterations should be stored in traderData
             traderData = {}
 
             # Starfuit EMA Data
-            ema_period = 4
-            traderData['STARFRUIT'] = {'ema': -1, 'smoothing_factor':  1 / (ema_period + 1)}
+            traderData['STARFRUIT'] = {'ema': -1, 'smoothing_factor':  1 / (self.starfruit_ema_period + 1)}
 
-            # Ingredients Data
-            traderData['INGREDIENTS'] = {'last_basket_price': 0, 'last_ingredients_price': 0, 'n': 0, 'x': 0, 'sum_x': 0, 'sum_x_squared': 0}
-
-            # Coconuts Data
-            ema_period = 4
-            traderData['COCONUT'] = {'last_product_price': 0, 'last_coupon_price': 0, 'coupon_virtual_position': 0}
+            # Gift Basket Data
+            traderData['GIFT_BASKET'] = {'n': 0, 'x': 0, 'sum_x': 0, 'sum_x_squared': 0}
 
         else:
             traderData = jsonpickle.decode(state.traderData)
@@ -94,84 +103,96 @@ class Trader:
             position = state.position.get(product, 0)
             max_position = self.max_positions[product]
             
-            print(f"")
             match(product):
                 case "AMETHYSTS":
-                    acceptable_price = 10000
-                    orders.append(Order(product, acceptable_price-2, max_position - position))
-                    orders.append(Order(product, acceptable_price+2, -max_position - position))
+                    orders.append(Order(product, self.amethysts_acceptable_price-2, max_position - position))
+                    orders.append(Order(product, self.amethysts_acceptable_price+2, -max_position - position))
                 
                 case "STARFRUIT":
-                    traderData['STARFRUIT'], tradable = self.calculate_exponential_ma(traderData['STARFRUIT'], order_depth)
+                    traderData['STARFRUIT'], tradable = self.starfruit_calculate_exponential_ma(traderData['STARFRUIT'], order_depth)
                     if tradable:
-                        acceptable_price = round(traderData['STARFRUIT']['ema'])
-                        orders.append(Order(product, acceptable_price-2, max_position - position))
-                        orders.append(Order(product, acceptable_price+2, -max_position - position))
+                        orders.append(Order(product, round(traderData['STARFRUIT']['ema'])-2, max_position - position))
+                        orders.append(Order(product, round(traderData['STARFRUIT']['ema'])+2, -max_position - position))
 
                 case "ORCHIDS":
                     conversions = -position
                     observations = state.observations.conversionObservations['ORCHIDS']
-                    international_ask = observations.askPrice + observations.transportFees + observations.importTariff
-                    best_bid = list(order_depth.buy_orders.keys())[0]
-                    orders.append(Order(product, int(max(np.ceil(international_ask), best_bid + 2)), -max_position))
-                
-                case "CHOCOLATE" | "STRAWBERRIES" | "ROSES":
-                    product_multiplier = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
-                    traderData['INGREDIENTS']['last_ingredients_price'] += self.calculate_weighted_mid_price(order_depth) * product_multiplier[product]
+                    international_ask_price = observations.askPrice + observations.transportFees + observations.importTariff
+                    best_bid_price = list(order_depth.buy_orders.keys())[0]
+                    orders.append(Order(product, int(max(np.ceil(international_ask_price), best_bid_price + 2)), -max_position))
                 
                 case "GIFT_BASKET":
-                    traderData['INGREDIENTS']['last_basket_price'] = self.calculate_weighted_mid_price(order_depth)
-                    
-                    traderData['INGREDIENTS']['n'] += 1
-                    traderData['INGREDIENTS']['x'] = traderData['INGREDIENTS']['last_basket_price'] - traderData['INGREDIENTS']['last_ingredients_price']
-                    traderData['INGREDIENTS']['sum_x'] += traderData['INGREDIENTS']['x']
-                    traderData['INGREDIENTS']['sum_x_squared'] += traderData['INGREDIENTS']['x'] ** 2
- 
-                    target_position, tradable = self.gift_basket_calculate_target_position(traderData['INGREDIENTS'], self.max_positions['GIFT_BASKET'])
-                    best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
-                    
-                    if tradable:
-                        threshold_target_position = 46
-                        if target_position < -threshold_target_position:
-                            orders.append(Order(product, best_bid, -max_position - position))
-                            #result = self.ingredients_buy(state, traderData, result)
-                        elif target_position > threshold_target_position:
-                            orders.append(Order(product, best_ask, max_position - position))
-                            #result = self.ingredients_sell(state, traderData, result)
+                    gift_basket_price = self.calculate_weighted_mid_price(order_depth)
+                    ingredients_price = 0
+                    for ingredient in self.gift_basket_ingredients:
+                        ingredients_price += self.calculate_weighted_mid_price(state.order_depths[ingredient]) * self.gift_basket_ingredient_multiplier[ingredient]
 
-                    # Needed to provide entry for next iteration
-                    traderData['INGREDIENTS']['last_ingredients_price'] = 0
+                    traderData['GIFT_BASKET']['n'] += 1
+                    traderData['GIFT_BASKET']['x'] = gift_basket_price - ingredients_price
+                    traderData['GIFT_BASKET']['sum_x'] += traderData['GIFT_BASKET']['x']
+                    traderData['GIFT_BASKET']['sum_x_squared'] += traderData['GIFT_BASKET']['x'] ** 2
+ 
+                    target_position, tradable = self.gift_basket_calculate_target_position(traderData['GIFT_BASKET'])
+                    best_bid_price, best_bid_volume = list(order_depth.buy_orders.items())[0]
+                    best_ask_price, best_ask_volume = list(order_depth.sell_orders.items())[0]
+                    
+                    self.gift_basket_virtual_position = position
+                    if tradable:
+                        if target_position < -self.basket_threshold_target_position:
+                            orders.append(Order(product, best_bid_price, -max_position - position))
+                            self.gift_basket_virtual_position -= best_bid_volume
+
+                        elif target_position > self.basket_threshold_target_position:
+                            orders.append(Order(product, best_ask_price, max_position - position))
+                            self.gift_basket_virtual_position -= best_ask_volume
+
+                # case "CHOCOLATE" | "STRAWBERRIES" | "ROSES":
+                #     best_bid_price, best_ask_price = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
+                    
+                #     self.gift_basket_virtual_position = max(-60, min(60, self.gift_basket_virtual_position))
+                #     target_position = -1 * self.gift_basket_virtual_position * self.gift_basket_ingredient_multiplier[product]
+                #     # Strawberries max position is 350, 60 * 6 = 360, which is greater than max_position, hence cap needed.
+                #     target_position = max(-350, min(350, target_position))
+
+                #     if target_position - position > 0:
+                #         orders.append(Order(product, best_ask_price, round(target_position - position)))
+                #     elif target_position - position < 0:
+                #         orders.append(Order(product, best_bid_price, round(target_position - position)))
 
                 case 'COCONUT_COUPON':
-                    traderData['COCONUT']['last_coupon_price'] = self.calculate_weighted_mid_price(state.order_depths['COCONUT_COUPON'])
-                    traderData['COCONUT']['last_product_price'] = self.calculate_weighted_mid_price(state.order_depths['COCONUT'])
-                    if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
+                    self.coconut_coupon_price = self.calculate_weighted_mid_price(state.order_depths['COCONUT_COUPON'])
+                    self.coconut_price = self.calculate_weighted_mid_price(state.order_depths['COCONUT'])
+                    if self.coconut_coupon_price == None or self.coconut_price == None:
                         break
 
-                    black_scholes_price = self.coconuts_calculate_black_scholes(traderData['COCONUT']['last_product_price'])
-                    coupon_bid_ask_spread_d2 = 1.2808260275342511 / 2
-
-                    traderData['COCONUT']['coupon_virtual_position'] = state.position.get('COCONUT_COUPON', 0)
-                    if traderData['COCONUT']['last_coupon_price'] > black_scholes_price + coupon_bid_ask_spread_d2:
-                        best_bid_price, best_bid_volume = list(order_depth.buy_orders.items())[0]
-                        traderData['COCONUT']['coupon_virtual_position'] -= best_bid_volume
+                    black_scholes_price = self.coconuts_calculate_black_scholes(self.coconut_price)
+                    best_bid_price, best_bid_volume = list(order_depth.buy_orders.items())[0]
+                    best_ask_price, best_ask_volume = list(order_depth.sell_orders.items())[0]
+                    
+                    self.coco_coupon_virtual_position = position
+                    if self.coconut_coupon_price > black_scholes_price + self.coco_coupon_bid_ask_spread_d2:
+                        self.coco_coupon_virtual_position -= best_bid_volume
                         orders.append(Order(product, best_bid_price, -max_position - position))
 
-                    elif traderData['COCONUT']['last_coupon_price'] < black_scholes_price - coupon_bid_ask_spread_d2:
-                        best_ask_price, best_ask_volume = list(order_depth.sell_orders.items())[0]
-                        traderData['COCONUT']['coupon_virtual_position'] -= best_ask_volume
+                    elif self.coconut_coupon_price < black_scholes_price - self.coco_coupon_bid_ask_spread_d2:
+                        self.coco_coupon_virtual_position -= best_ask_volume
                         orders.append(Order(product, best_ask_price, max_position - position))
 
                 case 'COCONUT':
-                    if traderData['COCONUT']['last_coupon_price'] == None or traderData['COCONUT']['last_product_price'] == None:
+                    if self.coconut_coupon_price == None or self.coconut_price == None:
                         break
-                    delta = self.coconuts_calculate_delta(traderData['COCONUT']['last_product_price'])
-                    target_position = -delta * traderData['COCONUT']['coupon_virtual_position']
-                    best_bid, best_ask = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
+
+                    self.coco_coupon_virtual_position = max(-600, min(600, self.coco_coupon_virtual_position))
+                    delta = self.coconuts_calculate_delta(self.coconut_price)
+                    target_position = -delta * self.coco_coupon_virtual_position
+                    target_position = max(-300, min(300, target_position))
+                    
+                    best_bid_price, best_ask_price = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
                     if target_position - position > 0:
-                        orders.append(Order(product, best_ask, round(target_position - traderData['COCONUT']['coupon_virtual_position'])))
+                        orders.append(Order(product, best_ask_price, round(target_position - self.coco_coupon_virtual_position)))
+
                     elif target_position - position < 0:
-                        orders.append(Order(product, best_bid, round(target_position - traderData['COCONUT']['coupon_virtual_position'])))
+                        orders.append(Order(product, best_bid_price, round(target_position - self.coco_coupon_virtual_position)))
                            
             # Don't modify anything below this comment
             result[product] = orders
