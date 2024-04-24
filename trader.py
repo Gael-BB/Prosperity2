@@ -136,28 +136,12 @@ class Trader:
                     best_bid_price, best_bid_volume = list(order_depth.buy_orders.items())[0]
                     best_ask_price, best_ask_volume = list(order_depth.sell_orders.items())[0]
                     
-                    self.gift_basket_virtual_position = position
                     if tradable:
                         if target_position < -self.basket_threshold_target_position:
                             orders.append(Order(product, best_bid_price, -max_position - position))
-                            self.gift_basket_virtual_position -= best_bid_volume
 
                         elif target_position > self.basket_threshold_target_position:
                             orders.append(Order(product, best_ask_price, max_position - position))
-                            self.gift_basket_virtual_position -= best_ask_volume
-
-                # case "CHOCOLATE" | "STRAWBERRIES" | "ROSES":
-                #     best_bid_price, best_ask_price = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
-                    
-                #     self.gift_basket_virtual_position = max(-60, min(60, self.gift_basket_virtual_position))
-                #     target_position = -1 * self.gift_basket_virtual_position * self.gift_basket_ingredient_multiplier[product]
-                #     # Strawberries max position is 350, 60 * 6 = 360, which is greater than max_position, hence cap needed.
-                #     target_position = max(-350, min(350, target_position))
-
-                #     if target_position - position > 0:
-                #         orders.append(Order(product, best_ask_price, round(target_position - position)))
-                #     elif target_position - position < 0:
-                #         orders.append(Order(product, best_bid_price, round(target_position - position)))
 
                 case 'COCONUT_COUPON':
                     self.coconut_coupon_price = self.calculate_weighted_mid_price(state.order_depths['COCONUT_COUPON'])
@@ -189,10 +173,10 @@ class Trader:
                     
                     best_bid_price, best_ask_price = list(order_depth.buy_orders.keys())[0], list(order_depth.sell_orders.keys())[0]
                     if target_position - position > 0:
-                        orders.append(Order(product, best_ask_price, round(target_position - self.coco_coupon_virtual_position)))
+                        orders.append(Order(product, best_ask_price, round(target_position - position)))
 
                     elif target_position - position < 0:
-                        orders.append(Order(product, best_bid_price, round(target_position - self.coco_coupon_virtual_position)))
+                        orders.append(Order(product, best_bid_price, round(target_position - position)))
                            
             # Don't modify anything below this comment
             result[product] = orders
