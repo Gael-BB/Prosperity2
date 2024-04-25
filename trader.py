@@ -67,7 +67,7 @@ class Trader:
             return 0, False
         return -erf((data['x'] - mean) / std) * self.max_positions['GIFT_BASKET'], True
 
-    # Coconuts Function
+    # Coconuts Functions
     def coconuts_calculate_black_scholes(self, S):
         sigma, T, r, K = self.coco_sigma, self.coco_T, self.coco_r, self.coco_K
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
@@ -78,6 +78,19 @@ class Trader:
         sigma, T, r, K = self.coco_sigma, self.coco_T, self.coco_r, self.coco_K
         d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
         return 0.5 * (1 + erf(d1/np.sqrt(2)))
+    
+    # Trader Functions
+    def trader_calculate_vinnie_position(self, product, state):
+        position = 0
+        trades = state.market_trades.get(product, [])
+        for trade in trades:
+            if trade.buyer == trade.seller:
+                continue
+            if trade.buyer == 'Vinnie':
+                position += trade.quantity
+            elif trade.seller == 'Vinnie':
+                position -= trade.quantity
+        return position
     
     # Main Function
     def run(self, state: TradingState):
