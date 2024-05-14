@@ -1,11 +1,30 @@
-# Prosperity2
-This repository shows our code for the IMC Trading Competition Prosperity2. This competition consisted of 5 rounds, each one with an algorithmic trading part and manual trading part that consisted of solving a brain teaser, related to probability and game theory.
+# IMC Trading Competition Prosperity 2
+This repository shows our code for the IMC Trading Competition Prosperity2. We placed top 1% out of 10,000 teams in a team of 4. The competition consisted of using algorithms to trade virtual products in a simulated market. The competition had 5 rounds. A probability and game theory brain teaser was given in each round.
+
+In each round, a new product or mechanic was added. We were given data for 3 virtual trading days for the new products. The objective was to make a strategy from the data and submit the code before the end of the round. At the end of each round, our algorithms were evaluated and our balances were updated.
 
 # Round 1
-In the first round, we got introduced to two products: AMETHYSTS and STARFRUIT. Amethysts was quite easy to trade as it's price stayed around 10000 units. We traded it by simply putting buying orders at 9998 and 10002. Starfruit's price was very spiky, but a moving average showed that it's price did not move much. It's trend would change quite suddenly so we opted for an exponential moving average. We bought starfruit when the spikes went below the moving average and sold when the spikes would go above.
+Introduced products: AMETHYSTS and STARFRUIT.
+Amethyst's price was very stable, it always stayed around 10,000 units. The best results came from simply placing buy orders at 9998 and sell orders at 10002.
+Starfruit's price was periodic, although it did move a bit. We used an exponential moving average to calculate a fair price. We then placed buy orders below the fair price and sell orders above the fair price.
 
 # Round 2
-In the second round, we were introduced to ORCHIDS. Orchids were brought two new features. The first feature allowed to measure the current humidity and sunlight, said to influence the price of orchids significantly. The second feature allowed us to buy and sell orchids with another island. After thorough analysis consisting of many different linear and non-linear regressions, no pattern was found. We concluded that the sunlight and humidity indicators were simply a distraction from the main opportunity to make profit, arbitrage. The cost of importing the product was at time lower than the price of sell the item to the island. This was not obvious to spot as we were given no past data on total importing/exporting prices. Our strategy was therefor simply putting selling orders just above the price of importing the product.
+Introduced product: ORCHIDS.
+Introduced mechanics: Ability to buy/sell orchids with another market with import, transport, and export taxes. Ability to measure sunlight and humidity.
+Sunlight and humidity were said to affect the orchid's price significantly. Through thorough analysis and regressions, we found that humidity and sunlight did not have any effect on the price. We concluded that it served as a distraction.
+We found that the prices of orchids were significantly lower in the other market. There were a lot of arbitrage opportunities. Our strategy concluded in placing sell orders above the price of importing and buying orchids and importing to bring our position back from negative to neutral in the next time step.
 
 # Round 3
-In the third round, we were introduced to 4 new products: CHOCOLATE, STRAWBERRIES, ROSES, GIFT_BASKET. In theory, a gift basket consists of 4 chocolate bars, 6 strawberries and 1 rose. The price of gift basket was very correlated to the cost of the constituents of the basket. We devised a very simple pair trading strategy. We treated the price of the gift basket as being the sum of the constituents and a premium. We dynamically calculated the mean price and the standard deviation of the premium. This way we knew when the premium was under or over valued. When the premium was a certain amounts of standard deviations away from the mean, we operated. Surprisingly, we found that instead of doing the opposite operation on the consituents, we made a lot of profit by doing the same operation.
+Introduced products: CHOCOLATE, STRAWBERRIES, ROSES, GIFT_BASKET.
+We were told a gift basket consisted of 6 strawberries, 4 chocolate bars, and 1 rose. By subtracting the price of the components from the price of the gift basket, we could calculate the price of the premium of the basket. We then decided to implement a pair trading algorithm, by trading when the z score of the price of the premium was above or below a certain threshold.
+The mean and variance varied significantly in the past data for each trading day. We decided to not trade for the first 1% of a trading day to calculate the mean and variance of the premium price. We then calculated the premium dynamically throughout the trading day.
+This strategy worked quite well for the gift baskets but wasn't consistent enough for the other products.
+
+# Round 4
+Introduced products: COCONUT, COCONUT_COUPON.
+Coconut coupon was an option for the coconut product. By using the Black Scholes model, we were able to find the fair price of the coconut coupon. We then placed buy orders below the fair price and sell orders above the fair price.
+Coconut was quite volatile, and consequently coconut coupon as well. To stay market-neutral, we used delta hedging.
+
+# Round 5
+Introduced mechanics: Ability to view past trades of simulated virtual traders.
+We tried various strategies, using the positions and/or the past trades of different traders without success. We then decided to not change our strategy for this round.
